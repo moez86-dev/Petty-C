@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة العهدة</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #cfa2d5;
+      font-family: 'Cairo', sans-serif;
+      direction: rtl; /* دعم اللغة العربية */
+    }
+    .container {
+      margin-top: 20px;
+    }
+    .card-header {
+      background: linear-gradient(45deg, #007bff, #00d2ff);
+      color: white;
+      font-size: 1.2rem;
+    }
+    .table-container {
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    .icon-circle {
+      background: linear-gradient(45deg, #28a745, #00d2ff);
+      color: white;
+      font-size: 1.2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+    }
+    .action-icons i {
+      font-size: 1.2rem;
+      cursor: pointer;
+      margin: 0 5px;
+    }
+    .action-icons i:hover {
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- عنوان -->
+    <h2 class="text-center my-4 text-primary">
+      <i class="fa-solid fa-clipboard-list"></i> إدارة العهدة اليومية
+    </h2>
+
+    <!-- زر الإضافة -->
+    <div class="mb-4 text-end">
+      <button class="btn btn-success" id="addDelegateBtn">
+        <i class="fa-solid fa-plus"></i> إضافة مندوب
+      </button>
+      <button class="btn btn-primary" id="exportToExcelBtn">
+        <i class="fa-solid fa-file-excel"></i> تصدير إلى Excel
+      </button>
+    </div>
+
+    <!-- جدول البيانات -->
+    <div class="table-container">
+      <table class="table table-striped table-hover text-center align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th>
+            <th>الاسم</th>
+            <th>العهدة (ريال)</th>
+            <th>الفواتير (ريال)</th>
+            <th>تاريخ استلام العهدة</th>
+            <th>تاريخ تصفية الفواتير</th>
+            <th>الفرق بالأيام</th>
+            <th>الفرق المالي</th>
+            <th>الحالة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="delegateList">
+          <!-- يتم ملء الصفوف ديناميكياً -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- JavaScript -->
+  <script>
+    // وظيفة لحفظ البيانات في localStorage
+    function saveToLocalStorage() {
+      localStorage.setItem('delegates', JSON.stringify(delegates));
+    }
+
+    // استرجاع البيانات من localStorage أو تعيين القيم الافتراضية
+    let delegates = JSON.parse(localStorage.getItem('delegates')) || [
+      { name: 'أحمد', cash: 500, invoices: 480, receiptDate: '2024-01-01', settlementDate: '2024-01-15' },
+      { name: 'خالد', cash: 500, invoices: 500, receiptDate: '2024-01-05', settlementDate: '2024-01-20' },
+    ];
+
+    const delegateList = document.getElementById('delegateList');
+    const addDelegateBtn = document.getElementById('addDelegateBtn');
+
+    // وظيفة للتحقق من صحة التاريخ
+    function isValidDate(dateString) {
+      const regex = /^\d{4}-\d{2}-\d{2}$/; // التنسيق: YYYY-MM-DD
+      if (!regex.test(dateString)) return false;
+
+      const date = new Date(dateString);
+      return date instanceof Date && !isNaN(date);
+    }
+
+    // حساب الفرق بالأيام بين تاريخين
+    function calculateDaysDifference(startDate, endDate) {
+      if (!isValidDate(startDate) || !isValidDate(endDate)) return 'غير محدد';
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const difference = Math.floor((end - start) / (1000 * 60 * 60 * 24)); // تحويل الفرق إلى أيام
+      return difference >= 0 ? difference : 'غير صحيح';
+    }
+
+    // وظيفة لعرض الصفوف
+    function renderDelegates() {
+      delegateList.innerHTML = ''; // تنظيف القائمة
+      delegates.forEach((delegate, index) => {
+        const difference = delegate.invoices - delegate.cash; // حساب الفرق المالي
+        const daysDifference = calculateDaysDifference(delegate.receiptDate, delegate.settlementDate); // الفرق بالأيام
+        const status = difference === 0 ? 'مطابقة' : difference > 0 ? 'زيادة' : 'نقص';
+        const badgeClass = difference === 0 ? 'bg-success' : difference > 0 ? 'bg-danger' : 'bg-warning';
+
+        delegateList.innerHTML += `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${delegate.name}</td>
+            <td>${delegate.cash}</td>
+            <td>${delegate.invoices}</td>
+            <td>${delegate.receiptDate || 'غير محدد'}</td>
+            <td>${delegate.settlementDate || 'غير محدد'}</td>
+            <td>${daysDifference} يوم</td>
+            <td>${difference} ريال</td>
+            <td>
+              <span class="badge ${badgeClass}">${status}</span>
+            </td>
+            <td class="action-icons">
+              <i class="fa-solid fa-pen text-primary" onclick="editDelegate(${index})"></i>
+              <i class="fa-solid fa-trash text-danger" onclick="deleteDelegate(${index})"></i>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    // وظيفة لإضافة مندوب
+    addDelegateBtn.addEventListener('click', () => {
+      const name = prompt('أدخل اسم المندوب:');
+      const cash = parseFloat(prompt('أدخل قيمة العهدة:'));
+      const invoices = parseFloat(prompt('أدخل قيمة الفواتير:'));
+      const receiptDate = prompt('أدخل تاريخ استلام العهدة (yyyy-mm-dd):');
+      const settlementDate = prompt('أدخل تاريخ تصفية الفواتير (yyyy-mm-dd):');
+
+      if (!isValidDate(receiptDate) || !isValidDate(settlementDate)) {
+        alert('تأكد من إدخال تاريخ صحيح بالتنسيق YYYY-MM-DD!');
+        return;
+      }
+
+      if (name && !isNaN(cash) && !isNaN(invoices)) {
+        delegates.push({ name, cash, invoices, receiptDate, settlementDate });
+        saveToLocalStorage(); // تحديث التخزين
+        renderDelegates();
+      } else {
+        alert('تأكد من إدخال البيانات بشكل صحيح!');
+      }
+    });
+
+    // وظيفة لتعديل مندوب
+    function editDelegate(index) {
+      const delegate = delegates[index];
+      const name = prompt('أدخل اسم المندوب الجديد:', delegate.name);
+      const cash = parseFloat(prompt('أدخل قيمة العهدة الجديدة:', delegate.cash));
+      const invoices = parseFloat(prompt('أدخل قيمة الفواتير الجديدة:', delegate.invoices));
+      const receiptDate = prompt('أدخل تاريخ استلام العهدة (yyyy-mm-dd):', delegate.receiptDate);
+      const settlementDate = prompt('أدخل تاريخ تصفية الفواتير (yyyy-mm-dd):', delegate.settlementDate);
+
+      if (!isValidDate(receiptDate) || !isValidDate(settlementDate)) {
+        alert('تأكد من إدخال تاريخ صحيح بالتنسيق YYYY-MM-DD!');
+        return;
+      }
+
+      if (name && !isNaN(cash) && !isNaN(invoices)) {
+        delegates[index] = { name, cash, invoices, receiptDate, settlementDate };
+        saveToLocalStorage(); // تحديث التخزين
+        renderDelegates();
+      } else {
+        alert('تأكد من إدخال البيانات بشكل صحيح!');
+      }
+    }
+
+    // وظيفة لحذف مندوب
+    function deleteDelegate(index) {
+      if (confirm('هل أنت متأكد من حذف هذا المندوب؟')) {
+        delegates.splice(index, 1);
+        saveToLocalStorage(); // تحديث التخزين
+        renderDelegates();
+      }
+    }
+
+    // وظيفة لتصدير التقرير إلى Excel
+    document.getElementById('exportToExcelBtn').addEventListener('click', () => {
+      const ws = XLSX.utils.json_to_sheet(delegates.map(delegate => ({
+        الاسم: delegate.name,
+        "العهدة": delegate.cash,
+        "الفواتير": delegate.invoices,
+        "تاريخ استلام العهدة": delegate.receiptDate || "غير محدد",
+        "تاريخ تصفية الفواتير": delegate.settlementDate || "غير محدد",
+        "الفرق بالأيام": calculateDaysDifference(delegate.receiptDate, delegate.settlementDate),
+        "الفرق المالي": delegate.invoices - delegate.cash,
+      })));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'التقرير');
+      XLSX.writeFile(wb, 'تقرير_العهدة.xlsx');
+    });
+
+    // عرض البيانات عند تحميل الصفحة
+    renderDelegates();
+  </script>
+</body>
+</html>
